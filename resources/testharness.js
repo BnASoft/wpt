@@ -1186,22 +1186,32 @@ policies and contribution forms [3].
 
     function assert_array_equals(actual, expected, description)
     {
-        const shorter_array_length_limit = 20;
+        const max_array_length = 20;
         function shorten_array(arr, offset = 0) {
             // Make ", …" only show up when it would likely reduce the length, not accounting for
             // fonts.
-            if (arr.length < shorter_array_length_limit + 2) {
+            if (arr.length < max_array_length + 2) {
                 return arr;
             }
-            const shorterArrayEnd = shorter_array_length_limit + offset;
-            const shorterArray = arr.slice(offset, shorterArrayEnd);
-            if (offset !== 0) {
-                shorterArray.beginEllipsis = true;
+            // By default we want half the elements after the offset and half before
+            // But if that takes us past the end of the array, we have more before, and
+            // if it takes us before the start we have more after.
+            const length_after_offset = Math.floor(max_array_length / 2);
+            let upper_bound = Math.min(length_after_offset + offset, arr.length);
+            let lower_bound = Math.max(upper_bound - max_array_length, 0);
+
+            if (lower_bound === 0) {
+                upper_bound = max_array_length;
             }
-            if (arr.length > shorterArrayEnd) {
-                shorterArray.endEllipsis = true;
+
+            const output = arr.slice(lower_bound, upper_bound);
+            if (lower_bound > 0) {
+                output.beginEllipsis = true;
             }
-            return shorterArray;
+            if (upper_bound < arr.length) {
+                output.endEllipsis = true;
+            }
+            return output;
         }
 
         assert(typeof actual === "object" && actual !== null && "length" in actual,
@@ -1210,8 +1220,11 @@ policies and contribution forms [3].
                {actual:actual});
         assert(actual.length === expected.length,
                "assert_array_equals", description,
-               "lengths differ, expected array ${expected} got ${actual}",
-               {expected:shorten_array(expected), actual:shorten_array(actual)});
+               "lengths differ, expected array ${expected} length ${expectedLength}, got ${actual} length ${actualLength}",
+               {expected:shorten_array(expected, expected.length - 1),
+                expectedLength:expected.length,
+                actual:shorten_array(actual, actual.length - 1),
+                actualLength:actual.length});
 
         for (var i = 0; i < actual.length; i++) {
             assert(actual.hasOwnProperty(i) === expected.hasOwnProperty(i),
